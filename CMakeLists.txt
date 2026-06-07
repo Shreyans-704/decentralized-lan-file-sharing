@@ -6,15 +6,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# Phase 1 + 3 (sender/receiver rewritten for chunking)
-add_executable(sender   src/sender.cpp)
-add_executable(receiver src/receiver.cpp)
+# Phase 1 + 3 + 4 (IMPORTANT: add hasher.cpp)
+add_executable(sender
+    src/sender.cpp
+    src/hasher.cpp
+)
+
+add_executable(receiver
+    src/receiver.cpp
+    src/hasher.cpp
+)
 
 # Phase 2
 add_executable(broadcaster src/discovery/broadcaster.cpp)
 add_executable(listener    src/discovery/listener.cpp)
 
-# Link Winsock2 to all
+# Link Winsock2
 target_link_libraries(sender      PRIVATE ws2_32)
 target_link_libraries(receiver    PRIVATE ws2_32)
 target_link_libraries(broadcaster PRIVATE ws2_32 iphlpapi)

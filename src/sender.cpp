@@ -7,19 +7,17 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include "transfer/protocol.h"
+#include "hasher.h"
 
 using namespace std;
 
 #pragma comment(lib, "ws2_32.lib")
 
-const int    PORT       = 5000;
-const size_t CHUNK_SIZE = 512 * 1024; // 512 KB
+const int PORT = 5000;
 
-// ── Progress bar ───────────────────────────────────────────────────────
-void printProgress(uint32_t current, uint32_t total,
-                   double speed_mbps) {
-
-    int percent = static_cast<int>((current * 100.0) / total);
+// ── Progress bar ─────────────────────────────────────
+void printProgress(uint32_t current, uint32_t total, double speed_mbps) {
+    int percent = (int)((current * 100.0) / total);
     int bars    = percent / 2;
 
     cout << "\r[";
@@ -28,6 +26,17 @@ void printProgress(uint32_t current, uint32_t total,
 
     cout << "] " << percent << "% | "
          << speed_mbps << " MB/s  " << flush;
+}
+
+// Send exact bytes
+bool sendAll(SOCKET sock, const char* buf, int size) {
+    int sent = 0;
+    while (sent < size) {
+        int r = send(sock, buf + sent, size - sent, 0);
+        if (r == SOCKET_ERROR) return false;
+        sent += r;
+    }
+    return true;
 }
 
 int main(int argc, char* argv[]) {
@@ -41,14 +50,14 @@ int main(int argc, char* argv[]) {
     const char* receiver_ip = argv[1];
     const char* file_path   = argv[2];
 
-    // ── 1. Initialize Winsock ──────────────────────────────────────────
+    // ── 1. Winsock ──────────────────────────────────
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         cerr << "[-] WSAStartup failed." << endl;
         return 1;
     }
 
-    // ── 2. Open file ───────────────────────────────────────────────────
+    // ── 2. Open file ────────────────────────────────
     ifstream file(file_path, ios::binary | ios::ate);
     if (!file.is_open()) {
         cerr << "[-] Cannot open file: " << file_path << endl;
@@ -59,32 +68,31 @@ int main(int argc, char* argv[]) {
     uint64_t filesize = file.tellg();
     file.seekg(0);
 
-    uint32_t total_chunks = static_cast<uint32_t>(
-        (filesize + CHUNK_SIZE - 1) / CHUNK_SIZE);
+    uint32_t total_chunks =
+        (uint32_t)((filesize + CHUNK_SIZE_BYTES - 1) / CHUNK_SIZE_BYTES);
 
     string filepath_str(file_path);
     string filename = filepath_str.substr(
         filepath_str.find_last_of("/\\") + 1);
 
+    // ── 3. SHA-256 ──────────────────────────────────
+    cout << "[*] Computing SHA-256..." << endl;
+    string file_hash = SHA256::hashFile(file_path);
+    cout << "[+] Hash: " << file_hash << endl;
+
     cout << "[*] File   : " << filename << endl;
     cout << "[*] Size   : " << filesize << " bytes" << endl;
     cout << "[*] Chunks : " << total_chunks
-         << " x " << (CHUNK_SIZE / 1024) << " KB\n" << endl;
+         << " x " << (CHUNK_SIZE_BYTES / 1024) << " KB" << endl;
 
-    // ── 3. Create socket ───────────────────────────────────────────────
+    // ── 4. Socket + connect ─────────────────────────
     SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == INVALID_SOCKET) {
-        cerr << "[-] socket failed." << endl;
-        WSACleanup();
-        return 1;
-    }
 
-    // ── 4. Setup receiver address ──────────────────────────────────────
     sockaddr_in receiver_addr{};
     receiver_addr.sin_family = AF_INET;
     receiver_addr.sin_port   = htons(PORT);
 
-    // ✅ FIX: Windows-safe IP conversion
+    // ✅ FIX (Windows-safe)
     if (inet_addr(receiver_ip) == INADDR_NONE) {
         cerr << "[-] Invalid IP address." << endl;
         closesocket(sock);
@@ -96,9 +104,7 @@ int main(int argc, char* argv[]) {
 
     cout << "[*] Connecting to " << receiver_ip << "..." << endl;
 
-    // ── 5. Connect ─────────────────────────────────────────────────────
-    if (connect(sock,
-                (sockaddr*)&receiver_addr,
+    if (connect(sock, (sockaddr*)&receiver_addr,
                 sizeof(receiver_addr)) == SOCKET_ERROR) {
 
         cerr << "[-] connect failed: "
@@ -111,7 +117,23 @@ int main(int argc, char* argv[]) {
 
     cout << "[+] Connected!\n" << endl;
 
-    // ── 6. Send metadata ───────────────────────────────────────────────
+    // ── 5. Receive resume info ──────────────────────
+    ResumeRequest resume{};
+    recv(sock, (char*)&resume, sizeof(resume), 0);
+
+    vector<bool> already_received(total_chunks, false);
+
+    for (uint32_t i = 0; i < resume.received_count; i++) {
+        if (resume.received_ids[i] < total_chunks)
+            already_received[resume.received_ids[i]] = true;
+    }
+
+    if (resume.received_count > 0) {
+        cout << "[*] Resuming — skipping "
+             << resume.received_count << " chunks\n" << endl;
+    }
+
+    // ── 6. Send metadata ────────────────────────────
     FileMetadata meta{};
 
     strncpy(meta.filename, filename.c_str(),
@@ -120,64 +142,74 @@ int main(int argc, char* argv[]) {
 
     meta.filesize     = filesize;
     meta.total_chunks = total_chunks;
-    meta.chunk_size   = static_cast<uint32_t>(CHUNK_SIZE);
+    meta.chunk_size   = CHUNK_SIZE_BYTES;
 
-    send(sock, (char*)&meta, sizeof(meta), 0);
+    sendAll(sock, (char*)&meta, sizeof(meta));
 
-    // ── 7. Send chunks ─────────────────────────────────────────────────
-    vector<char> buffer(CHUNK_SIZE);
-    uint64_t total_sent = 0;
+    // ── 7. Send chunks ──────────────────────────────
+    vector<char> buffer(CHUNK_SIZE_BYTES);
+
+    uint64_t total_sent  = 0;
+    uint32_t chunks_sent = 0;
 
     auto start_time = chrono::steady_clock::now();
 
     for (uint32_t i = 0; i < total_chunks; i++) {
 
-        file.read(buffer.data(), CHUNK_SIZE);
-        uint32_t bytes_read = static_cast<uint32_t>(file.gcount());
+        size_t offset = (size_t)i * CHUNK_SIZE_BYTES;
 
-        // Send header
-        ChunkHeader header{ i, bytes_read };
-        send(sock, (char*)&header, sizeof(header), 0);
+        uint32_t to_read = (uint32_t)
+            min((uint64_t)CHUNK_SIZE_BYTES, filesize - offset);
 
-        // Send data safely
-        uint32_t sent = 0;
-        while (sent < bytes_read) {
+        file.seekg(offset);
+        file.read(buffer.data(), to_read);
 
-            int result = send(sock,
-                              buffer.data() + sent,
-                              bytes_read - sent, 0);
+        uint32_t bytes_read = (uint32_t)file.gcount();
 
-            if (result == SOCKET_ERROR) {
-                cerr << "\n[-] send failed: "
-                     << WSAGetLastError() << endl;
-                goto cleanup;
-            }
-
-            sent += result;
+        // Skip already received
+        if (already_received[i]) {
+            total_sent += bytes_read;
+            chunks_sent++;
+            continue;
         }
 
-        total_sent += bytes_read;
+        ChunkHeader header{ i, bytes_read };
 
-        // Speed calc
+        sendAll(sock, (char*)&header, sizeof(header));
+        sendAll(sock, buffer.data(), bytes_read);
+
+        total_sent += bytes_read;
+        chunks_sent++;
+
+        // Speed
         auto now = chrono::steady_clock::now();
-        double elapsed = chrono::duration<double>(
-            now - start_time).count();
+        double elapsed =
+            chrono::duration<double>(now - start_time).count();
 
         double speed = (elapsed > 0)
             ? (total_sent / (1024.0 * 1024.0)) / elapsed
             : 0.0;
 
-        speed = static_cast<int>(speed * 100) / 100.0;
+        speed = (int)(speed * 100) / 100.0;
 
-        printProgress(i + 1, total_chunks, speed);
+        printProgress(chunks_sent, total_chunks, speed);
     }
 
-    cout << "\n\n[+] File sent successfully!" << endl;
-    cout << "[+] Total sent: " << total_sent << " bytes" << endl;
+    // ── 8. Send hash ────────────────────────────────
+    HashPacket hp{};
 
-cleanup:
+    strncpy(hp.hash, file_hash.c_str(),
+            sizeof(hp.hash) - 1);
+    hp.hash[sizeof(hp.hash) - 1] = '\0';
+    sendAll(sock, (char*)&hp, sizeof(hp));
+
+    cout << "\n\n[+] File sent!" << endl;
+    cout << "[+] SHA-256 sent: " << file_hash << endl;
+
+    // ── 9. Cleanup ─────────────────────────────────
     file.close();
     closesocket(sock);
     WSACleanup();
+
     return 0;
 }
