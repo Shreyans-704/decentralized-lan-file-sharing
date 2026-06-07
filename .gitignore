@@ -1,0 +1,15 @@
+# Build folder
+build/
+
+# Executables
+*.exe
+*.out
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# VS Code
+.vscode/
