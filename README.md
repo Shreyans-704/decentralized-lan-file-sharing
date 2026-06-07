@@ -1,4 +1,4 @@
-# 🚀 Decentralized LAN File Sharing
+# 🚀 Decentralized LAN File Sharing System
 
 A C++ peer-to-peer file transfer system for local networks — inspired by AirDrop. Features automatic peer discovery, chunked transfer, real-time progress, SHA-256 integrity verification, and resume support.
 
