@@ -1,49 +1,38 @@
 # 🚀 Decentralized LAN File Sharing
-
-A C++ based peer-to-peer file transfer system that enables direct file sharing between devices over a local network using TCP sockets.
+A C++ based peer-to-peer file transfer system that enables direct file sharing between devices over a local network using TCP sockets and UDP-based peer discovery.
 
 ---
 
 ## 📌 Overview
-
-This project implements a **decentralized file sharing system** where two devices communicate directly over a LAN without any central server.
+This project implements a **decentralized file sharing system** where devices discover each other automatically and communicate directly over a LAN without any central server.
 
 It demonstrates:
-
 * Low-level **socket programming**
 * **TCP-based reliable data transfer**
+* **UDP-based peer discovery**
 * **Chunked file streaming**
 * Real-world networking concepts
 
 ---
 
 ## 🏗️ Project Structure
+<img width="567" height="320" alt="image" src="https://github.com/user-attachments/assets/4e4e1150-c265-42b2-bb04-69076c546134" />
 
-```
-decentralized-lan-file-sharing/
-├── src/
-│   ├── sender.cpp       ← Run on sender machine
-│   └── receiver.cpp     ← Run on receiver machine
-├── include/
-├── build/
-├── CMakeLists.txt
-└── README.md
-```
 
 ---
+## SYSTEM ARCHITECTURE : - 
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/e5f8a44a-bd1a-4df0-9409-5764430a2ea1" />
 
 ## ⚙️ Building the Project
 
 ### 🔧 Prerequisites
-
 * C++17 compatible compiler (MinGW / GCC / Clang)
 * CMake 3.10+
-* Windows / Linux / macOS
+* Windows (Winsock2)
 
 ---
 
 ### 🛠️ Build Steps
-
 ```bash
 mkdir build
 cd build
@@ -51,32 +40,55 @@ cmake ..
 cmake --build .
 ```
 
+Produces 4 executables:
+build/sender.exe
+build/receiver.exe
+build/broadcaster.exe
+build/listener.exe
+
 ---
 
 ## ▶️ Usage
 
-### 🖥️ Step 1: Start Receiver (Server)
+### 📡 Phase 2: Peer Discovery (Run First)
 
+#### Terminal 1 — Start Listener
 ```bash
-build\receiver.exe output.txt
+build\listener.exe
 ```
-
 Output:
 
+[] Listener started on port 5001
+[] Waiting for peers...
+
+#### Terminal 2 — Start Broadcaster
+```bash
+build\broadcaster.exe
 ```
-[*] Receiver listening on port 5000 ...
-```
+Output:
+[] Broadcasting as: Shreyans-PC
+[] Broadcasting every 2 seconds on port 5001
+[+] Broadcast sent: DISCOVER|Shreyans-PC|5000
+
+#### Listener detects peer:
+
 
 ---
 
-### 💻 Step 2: Run Sender (Client)
+### 📁 Phase 1: File Transfer
 
+#### Step 1: Start Receiver
+```bash
+build\receiver.exe output.txt
+```
+Output:
+[*] Receiver listening on port 5000 ...
+
+#### Step 2: Run Sender
 ```bash
 build\sender.exe <receiver_ip> testfile.txt
 ```
-
 Example:
-
 ```bash
 build\sender.exe 127.0.0.1 testfile.txt
 ```
@@ -86,117 +98,107 @@ build\sender.exe 127.0.0.1 testfile.txt
 ## 🧪 Example Output
 
 ### Receiver:
-
-```
 [*] Receiver listening on port 5000 ...
 [+] Connected from: 127.0.0.1
 [+] Received: 28 bytes
-[+] Sender disconnected normally.
 [+] File saved to: output.txt
-```
 
 ### Sender:
-
-```
-[*] Connecting to 127.0.0.1:5000 ...
+[] Connecting to 127.0.0.1:5000 ...
 [+] Connected to receiver.
-[*] Sending file: testfile.txt
+[] Sending file: testfile.txt
 [+] Progress: 100%
 [+] File sent successfully!
-```
 
 ---
 
-## 🔄 How It Works (TCP Flow)
+## 🔄 How It Works
 
-1. Receiver starts and listens on port **5000**
-2. Sender connects using receiver's IP address
-3. File is opened in binary mode
-4. File is split into **chunks (4KB buffer)**
-5. Sender sends chunks using `send()`
-6. Receiver receives chunks using `recv()`
-7. Data is written to output file
-8. Connection closes after transfer completes
+### Full Flow
+Both devices start broadcaster + listener
+↓
+UDP broadcast → "DISCOVER|hostname|port"
+↓
+Listener builds live peer list
+↓
+User selects target device
+↓
+TCP connection established
+↓
+File sent in chunks
+↓
+Receiver reassembles file
+↓
+Done ✅
 
----
+### Discovery Layer (UDP)
+* Each device broadcasts presence every **2 seconds**
+* Broadcast sent to `255.255.255.255:5001`
+* Listener maintains live `map<IP → Peer>`
+* Message format: `DISCOVER|<hostname>|<tcp_port>`
 
-## 🌐 TCP Explained (Beginner Friendly)
-
-This project uses **TCP (Transmission Control Protocol)** which ensures:
-
-* ✅ Reliable delivery (no data loss)
-* ✅ Ordered data (correct sequence)
-* ✅ Automatic retransmission of lost packets
-
-Unlike UDP, TCP guarantees that the file received is **exactly identical** to the original file.
+### Transfer Layer (TCP)
+1. Receiver binds and listens on port **5000**
+2. Sender connects using receiver's IP
+3. File opened in binary mode
+4. Data sent in **4KB buffer chunks**
+5. Receiver writes chunks to output file
+6. Connection closes after transfer
 
 ---
 
 ## 📊 Architecture
 
-* **Model**: Client-Server
-* **Protocol**: TCP/IP
-* **Port**: 5000
-* **Transfer Type**: Chunk-based streaming
+| Layer | Protocol | Port | Purpose |
+|---|---|---|---|
+| Discovery | UDP Broadcast | 5001 | Find peers on LAN |
+| Transfer | TCP | 5000 | Reliable file transfer |
+
+* **Model**: Decentralized P2P
 * **I/O Model**: Blocking sockets
+* **Platform**: Windows (Winsock2)
 
 ---
 
 ## 🔑 Key Concepts Used
-
-* Socket Programming (`socket`, `bind`, `listen`, `accept`, `connect`)
+* UDP Broadcast (`INADDR_BROADCAST`)
+* TCP Socket Programming (`bind`, `listen`, `accept`, `connect`)
 * File Handling (binary read/write)
-* Buffer-based data transfer
-* Network communication over LAN
+* Buffer-based chunked transfer
+* Peer list management (`std::map`)
 
 ---
 
 ## ⚠️ Notes
-
-* Works on same machine (`127.0.0.1`) and LAN networks
+* Both devices must be on the **same LAN/WiFi**
+* Firewall may block connections → allow ports **5000** and **5001**
 * No encryption/authentication (basic version)
-* Firewall may block connections (allow port 5000)
 
 ---
 
-## 🖼️ Flow Diagram
+## 🚀 Roadmap
 
-![TCP Flow](image.png)
-
-> Shows how sender and receiver communicate using TCP connection and chunk-based transfer.
-
----
-
-## 🚀 Future Enhancements
-
-* [ ] UDP-based peer discovery (AirDrop-like)
+* [x] Phase 1 — TCP file transfer
+* [x] Phase 2 — UDP peer discovery
+* [ ] Phase 3 — Chunking + live progress bar
+* [ ] Phase 4 — SHA-256 integrity + resume support
 * [ ] End-to-end encryption (AES)
-* [ ] Resume interrupted transfers
 * [ ] GUI interface
-* [ ] Multi-peer file sharing
-* [ ] Cross-platform optimization
 
 ---
 
 ## 🏆 Resume Highlight
-
-> Built a decentralized LAN-based file sharing system using C++ and TCP sockets, enabling reliable chunk-based file transfer between devices without a central server.
+> Built a decentralized P2P LAN file sharing system in C++ featuring UDP-based automatic peer discovery and TCP-based reliable file transfer, without any central server — inspired by AirDrop.
 
 ---
 
 ## 📌 Conclusion
-
 This project demonstrates fundamental concepts of:
-
 * Computer Networks
 * Distributed Systems
 * System Programming
 
-It serves as a strong foundation for building advanced systems like:
-
+Foundation for building:
 * Torrent clients
 * Cloud storage systems
 * Peer-to-peer networks
-
----
->>>>>>> 71fbcec (feat: Phase 1 - working TCP file transfer (sender + receiver))
