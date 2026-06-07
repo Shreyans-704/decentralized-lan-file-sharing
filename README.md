@@ -13,13 +13,41 @@ It demonstrates:
 * **Chunked file streaming**
 * Real-world networking concepts
 
----
-
 ## 🏗️ Project Structure
-<img width="567" height="320" alt="image" src="https://github.com/user-attachments/assets/4e4e1150-c265-42b2-bb04-69076c546134" />
 
+```
+decentralized-lan-file-sharing/
+│
+├── src/
+│   ├── sender.cpp              # TCP sender (chunk + progress)
+│   ├── receiver.cpp            # TCP receiver (chunk receive)
+│   │
+│   ├── discovery/
+│   │   ├── broadcaster.cpp
+│   │   └── listener.cpp
+│   │
+│   └── transfer/
+│       ├── hash.cpp
+│       └── resume.cpp
+│
+├── include/
+│   └── transfer/
+│       ├── protocol.h
+│       ├── hash.h
+│       └── resume.h
+│
+├── build/                      # DO NOT PUSH
+├── .gitignore
+├── CMakeLists.txt
+├── README.md
+├── image.png
+│
+└── runtime (ignored)
+    ├── testfile.bin
+    ├── received_testfile.bin
+    └── chunks.log
+```
 
----
 ## SYSTEM ARCHITECTURE : - 
 <img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/e5f8a44a-bd1a-4df0-9409-5764430a2ea1" />
 
