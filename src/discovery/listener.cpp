@@ -42,21 +42,20 @@ bool parseMessage(const string& msg,
 
 // Print current peer list
 void printPeerList(const map<string, Peer>& peers) {
-    cout << "\n========= Available Peers =========\n";
+    cout << "\n========= Available Devices =========\n";
 
     if (peers.empty()) {
-        cout << "  (none found yet)\n";
+        cout << "  No devices found\n";
     } else {
         int i = 1;
         for (auto& p : peers) {
             cout << "  " << i++ << ". "
-                 << p.second.name << " ("
-                 << p.second.ip   << ":"
-                 << p.second.port << ")\n";
+                 << p.second.name << "   "
+                 << p.second.ip   << "\n";
         }
     }
 
-    cout << "===================================\n\n";
+    cout << "=====================================\n\n";
 }
 
 int main() {
@@ -128,16 +127,24 @@ int main() {
         if (!parseMessage(message, sender_ip, peer))
             continue;
 
+            // ❌ Skip localhost
+            if (peer.ip == "127.0.0.1")
+                continue;
+
+            // ❌ Skip non-LAN IPs (optional but recommended)
+            if (peer.ip.find("192.168.") != 0)
+                continue;
+
         // New peer
         bool isNew = (peers.find(peer.ip) == peers.end());
 
-            peers[peer.ip] = peer;
+        peers[peer.ip] = peer;
 
-            if (isNew) {
-                cout << "[+] New peer found: "
-                    << peer.name << " (" << peer.ip << ")\n";
-                printPeerList(peers);
-}
+        if (isNew) {
+            cout << "\n[+] New device found: "
+                << peer.name << " (" << peer.ip << ")\n";
+            printPeerList(peers);
+        }
     }
 
     closesocket(sock);

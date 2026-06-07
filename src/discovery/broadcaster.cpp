@@ -54,11 +54,11 @@ int main() {
     broadcast_addr.sin_family      = AF_INET;
     broadcast_addr.sin_port        = htons(DISCOVERY_PORT);
     broadcast_addr.sin_addr.s_addr = INADDR_BROADCAST;
-
     string hostname = getHostname();
 
-    // Message format: "DISCOVER|<hostname>|<tcp_port>"
-    string message = "DISCOVER|" + hostname + "|5000";
+    // Message format: "DISCOVER|<hostname>|<tcp_port>|<device_id>"
+    string device_id = hostname + "_123"; // simple unique ID (can improve later)
+    string message = "DISCOVER|" + hostname + "|5000|" + device_id;
 
     cout << "[*] Broadcasting as: " << hostname << endl;
     cout << "[*] Broadcasting every " << BROADCAST_INTERVAL_SEC
@@ -77,7 +77,12 @@ int main() {
         if (sent == SOCKET_ERROR) {
             cerr << "[-] sendto failed: " << WSAGetLastError() << endl;
         } else {
-            cout << "[+] Broadcast sent: " << message << endl;
+        static int counter = 0;
+            counter++;
+
+            if (counter % 3 == 0) {
+                cout << "[+] Broadcasting..." << endl;
+            }
         }
 
         Sleep(BROADCAST_INTERVAL_SEC * 1000);
