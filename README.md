@@ -180,7 +180,7 @@ Done ✅
 
 * [x] Phase 1 — TCP file transfer
 * [x] Phase 2 — UDP peer discovery
-* [ ] Phase 3 — Chunking + live progress bar
+* [x] Phase 3 — Chunking + live progress bar
 * [ ] Phase 4 — SHA-256 integrity + resume support
 * [ ] End-to-end encryption (AES)
 * [ ] GUI interface
