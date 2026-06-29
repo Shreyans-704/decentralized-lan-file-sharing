@@ -1,0 +1,121 @@
+# Decentralized LAN File Sharing - Run Commands (Windows CMD)
+
+Project Folder:
+C:\Users\shrey\OneDrive\Desktop\CODING\decentralized-lan-file-sharing
+
+==========================================================
+STEP 1 - Open Terminal 1
+==========================================================
+
+build\listener.exe
+
+Expected:
+[*] Listener started on port 5001
+[*] Waiting for peers...
+
+==========================================================
+STEP 2 - Open Terminal 2
+==========================================================
+
+build\broadcaster.exe
+
+Expected:
+[*] Broadcasting as: <HOSTNAME>
+[*] Broadcasting every 2 seconds on port 5001
+
+The Listener terminal should discover the peer.
+
+==========================================================
+STEP 3 - Open Terminal 3
+==========================================================
+
+build\receiver.exe
+
+Expected:
+[*] Receiver listening on port 5000
+[*] Waiting for sender...
+
+Leave this terminal running.
+
+==========================================================
+STEP 4 - Open Terminal 4
+==========================================================
+
+General Command:
+
+build\sender.exe <Receiver-IP> "<Full Path of File>"
+
+Example:
+
+build\sender.exe 192.168.56.1 "C:\Users\shrey\OneDrive\Desktop\Shreyans\RESUME - CV\Resume  - Shreyans Jaiswal.pdf"
+
+IMPORTANT:
+- Use only ONE pair of double quotes around the file path.
+- If the file path contains spaces, quotes are mandatory.
+
+==========================================================
+EXPECTED OUTPUT
+==========================================================
+
+[*] Computing SHA-256...
+[+] Connected!
+[############################] 100%
+[+] File sent!
+[+] SHA-256 sent!
+
+Receiver should:
+- Receive metadata
+- Receive all chunks
+- Verify SHA-256
+- Save the file
+
+==========================================================
+STOP ALL PROGRAMS
+==========================================================
+
+Press:
+
+Ctrl + C
+
+inside each terminal.
+
+==========================================================
+IF YOU MODIFY SOURCE CODE
+==========================================================
+
+Rebuild:
+
+cmake --build build
+
+Then run the four executables again.
+
+==========================================================
+PROJECT FLOW
+==========================================================
+
+Terminal 1
+Listener
+      │
+      ▼
+Terminal 2
+Broadcaster
+      │
+      ▼
+Peer Discovery
+      │
+      ▼
+Terminal 3
+Receiver
+      │
+      ▼
+Terminal 4
+Sender
+      │
+      ▼
+TCP File Transfer
+      │
+      ▼
+SHA-256 Verification
+      │
+      ▼
+Transfer Complete
