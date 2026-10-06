@@ -1,4 +1,4 @@
-# 🚀 Decentralized LAN File Sharing System
+# 🚀 Decentralized LAN File Sharing
 
 A C++ peer-to-peer file transfer system for local networks — inspired by AirDrop. Features automatic peer discovery, chunked transfer, real-time progress, SHA-256 integrity verification, and resume support.
 
@@ -282,3 +282,10 @@ Demonstrates core concepts of:
 - **System Programming** — binary protocols, file I/O, C++17
 
 Foundation for building BitTorrent clients, cloud storage systems, and peer-to-peer applications.
+
+
+
+
+//server side opening file transfer command :- 
+//build\sender.exe 127.0.0.1 "C:\Users\shrey\OneDrive\Desktop\SDE Intern JD.pdf" -- Path of the file 
+//build\receiver.exe
